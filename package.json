@@ -1,0 +1,17 @@
+{
+  "name": "sweeper",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "thehobbit85 <thehobbit85@gmail.com>",
+  "license": "ISC",
+  "dependencies": {
+    "await-sleep": "0.0.1",
+    "bcoin": "^1.0.0-beta.15",
+    "jsonfile": "^4.0.0",
+    "node-fetch": "^1.7.3"
+  }
+}
