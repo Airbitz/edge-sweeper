@@ -8,13 +8,15 @@ const confFileName = './conf.json'
 const config = js.readFileSync(confFileName)
 
 async function getUTXOS (address) {
-  let request = `${config.url}/addrs/${config.addressToSweep}?unspentOnly=true&limit=2&token=${config.token}`
+  let request = `${config.url}/addrs/${config.addressToSweep}?unspentOnly=true&limit=${config.limit}&token=${config.token}`
+  console.log(request)
   let response = await fetch(request)
   let jsonObj = await response.json()
   let txs = jsonObj.txrefs
   let rawUTXO = []
   for (let i = 0; i < txs.length; i++) {
     let request = `${config.url}/txs/${txs[i].tx_hash}?includeHex=true&token=${config.token}`
+    console.log(request)
     try {
       let response = await fetch(request)
       let jsonObj = await response.json()
