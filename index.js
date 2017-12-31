@@ -2,6 +2,7 @@ const fetch = require('node-fetch')
 const bcoin = require('bcoin')
 const js = require('jsonfile')
 const sleep = require('await-sleep')
+const cs = require('coinstring')
 
 const throttleTime = 200
 const confFileName = './conf.json'
@@ -56,19 +57,9 @@ async function createTX (utxos) {
     rate: config.rate,
     changeAddress: config.addressToSweep
   })
-  let privateKey = null
-
-  try {
-    const mnemonic = bcoin.hd.Mnemonic.fromPhrase(config.seed)
-    privateKey = bcoin.hd.PrivateKey.fromMnemonic(mnemonic)
-  } catch (e) {
-    const keyBuffer = Buffer.from(config.seed, 'hex')
-    const entropy = Buffer.from(config.seed, 'hex')
-    privateKey = bcoin.hd.PrivateKey.fromKey(keyBuffer, entropy)
-  }
-
-  const key = bcoin.primitives.KeyRing.fromOptions({ privateKey })
-
+  let privateKey = cs.decode(config.seed)
+  privateKey = privateKey.slice(1, privateKey.length - 1)
+  const key = bcoin.primitives.KeyRing.fromPrivate(privateKey, true)
   mtx.sign([key])
 
   return mtx
