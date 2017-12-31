@@ -60,10 +60,11 @@ async function createTX (utxos) {
 
   try {
     const mnemonic = bcoin.hd.Mnemonic.fromPhrase(config.seed)
-    privateKey = bcoin.hd.PrivateKey.fromMnemonic(mnemonic, this.network)
+    privateKey = bcoin.hd.PrivateKey.fromMnemonic(mnemonic)
   } catch (e) {
-    const keyBuffer = Buffer.from(config.seed, 'base64')
-    privateKey = bcoin.hd.PrivateKey.fromSeed(keyBuffer, this.network)
+    const keyBuffer = Buffer.from(config.seed, 'hex')
+    const entropy = Buffer.from(config.seed, 'hex')
+    privateKey = bcoin.hd.PrivateKey.fromKey(keyBuffer, entropy)
   }
 
   const key = bcoin.primitives.KeyRing.fromOptions({ privateKey })
