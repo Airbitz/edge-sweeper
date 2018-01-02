@@ -9,14 +9,36 @@ const throttleTime = 200
 const confFileName = './config.json'
 const config = js.readFileSync(confFileName)
 
+const maxErrors = 10
+
 async function getUTXOS (keyObject) {
-  let request = `${config.url}/addrs/${keyObject.addressToSweep}?unspentOnly=true&confirmation=1&limit=${config.limit}&token=${config.token}`
+  console.log('**********************************************************************')
+  console.log('*********** Getting utxos for address: ' + keyObject.addressToSweep)
+  let request = `${config.url}/addrs/${keyObject.addressToSweep}?unspentOnly=true&confirmation=1&limit=2000&token=${config.token}`
   console.log(request)
-  let response = await fetch(request)
+  let response
+  let numErrors = 0
+  while (1) {
+    try {
+      response = await fetch(request)
+      break
+    } catch (e) {
+      numErrors++
+      if (numErrors > maxErrors) {
+        console.log('Hit max errors')
+        return
+      }
+      console.log('Hit fetch error. Sleeping for ' + (throttleTime * numErrors).toString())
+      await sleep(throttleTime * numErrors)
+    }
+  }
   let jsonObj = await response.json()
   let txs = jsonObj.txrefs
   let rawUTXO = []
-  for (let i = 0; i < txs.length; i++) {
+  let numUtxoBlock = 0
+  let i = 0
+  numErrors = 0
+  while (i < txs.length) {
     let request = `${config.url}/txs/${txs[i].tx_hash}?includeHex=true&token=${config.token}`
     console.log(request)
     try {
@@ -29,13 +51,41 @@ async function getUTXOS (keyObject) {
           index: txs[i].tx_output_n,
           height: txs[i].block_height
         })
+
+        if (rawUTXO.length >= config.limit) {
+          const rawUtxoLimitBlock = rawUTXO.slice(0)
+          const tx = await createTX(rawUtxoLimitBlock, keyObject)
+          const txHex = tx.toRaw().toString('hex')
+          console.log('***** Hit limit. Creating tx *****')
+          console.log('tx: ', txHex)
+          fs.writeFileSync(`out/${keyObject.addressToSweep}_tx_${numUtxoBlock}.txt`, txHex + '\n')
+          numUtxoBlock++
+          rawUTXO = []
+        }
       }
+      numErrors = 0
+      i++
     } catch (e) {
       console.log(e)
+      numErrors++
+      if (numErrors > maxErrors) {
+        console.log('Hit max errors')
+        return
+      }
+      console.log('Hit error. Sleeping for ' + (throttleTime * numErrors).toString())
+      await sleep(throttleTime * numErrors)
     }
-    await sleep(throttleTime)
   }
-  return rawUTXO
+  if (rawUTXO.length) {
+    console.log('***** Creating final tx *****')
+    const rawUtxoLimitBlock = rawUTXO.slice(0)
+    const tx = await createTX(rawUtxoLimitBlock, keyObject)
+    const txHex = tx.toRaw().toString('hex')
+    console.log('tx: ', txHex)
+    fs.writeFileSync(`out/${keyObject.addressToSweep}_tx_${numUtxoBlock}.txt`, txHex + '\n')
+  }
+  await sleep(throttleTime)
+// return rawUTXO
 }
 
 async function createTX (utxos, keyObject) {
@@ -74,11 +124,11 @@ async function main () {
   }
   for (const keyObject of config.keysToSweep) {
     const rawUtxo = await getUTXOS(keyObject)
-    console.log('rawUtxo:', rawUtxo)
-    const tx = await createTX(rawUtxo, keyObject)
-    const txHex = tx.toRaw().toString('hex')
-    console.log('tx: ', txHex)
-    fs.writeFileSync(`out/${keyObject.addressToSweep}_tx.txt`, txHex + '\n')
+    // console.log('rawUtxo:', rawUtxo)
+    // const tx = await createTX(rawUtxo, keyObject)
+    // const txHex = tx.toRaw().toString('hex')
+    // console.log('tx: ', txHex)
+    // fs.writeFileSync(`out/${keyObject.addressToSweep}_tx.txt`, txHex + '\n')
   }
 }
 
