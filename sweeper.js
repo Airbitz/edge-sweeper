@@ -3,13 +3,14 @@ const bcoin = require('bcoin')
 const js = require('jsonfile')
 const sleep = require('await-sleep')
 const cs = require('coinstring')
+const fs = require('fs')
 
 const throttleTime = 200
-const confFileName = './conf.json'
+const confFileName = './config.json'
 const config = js.readFileSync(confFileName)
 
-async function getUTXOS (address) {
-  let request = `${config.url}/addrs/${config.addressToSweep}?unspentOnly=true&confirmation=1&limit=${config.limit}&token=${config.token}`
+async function getUTXOS (keyObject) {
+  let request = `${config.url}/addrs/${keyObject.addressToSweep}?unspentOnly=true&confirmation=1&limit=${config.limit}&token=${config.token}`
   console.log(request)
   let response = await fetch(request)
   let jsonObj = await response.json()
@@ -37,7 +38,7 @@ async function getUTXOS (address) {
   return rawUTXO
 }
 
-async function createTX (utxos) {
+async function createTX (utxos, keyObject) {
   const mtx = new bcoin.primitives.MTX()
   let amount = 0
   const coins = utxos.map(({ rawTx, index, height }) => { 
@@ -55,9 +56,9 @@ async function createTX (utxos) {
     selection: 'value',
     subtractFee: true,
     rate: config.rate,
-    changeAddress: config.addressToSweep
+    changeAddress: keyObject.addressToSweep
   })
-  let privateKey = cs.decode(config.seed)
+  let privateKey = cs.decode(keyObject.seed)
   privateKey = privateKey.slice(1, privateKey.length - 1)
   const key = bcoin.primitives.KeyRing.fromPrivate(privateKey, true)
   mtx.sign([key])
@@ -65,16 +66,33 @@ async function createTX (utxos) {
   return mtx
 }
 
+async function main () {
+  try {
+    fs.mkdirSync('out')
+  } catch (e) {
+    console.log(e)
+  }
+  for (const keyObject of config.keysToSweep) {
+    const rawUtxo = await getUTXOS(keyObject)
+    console.log('rawUtxo:', rawUtxo)
+    const tx = await createTX(rawUtxo, keyObject)
+    const txHex = tx.toRaw().toString('hex')
+    console.log('tx: ', txHex)
+    fs.writeFileSync(`out/${keyObject.addressToSweep}_tx.txt`, txHex + '\n')
+  }
+}
 
-getUTXOS()
-.then(rawUTXO => {
-  console.log('rawUTXO', rawUTXO)
-  return createTX(rawUTXO)
-})
-.then(tx => {
-  console.log('tx', tx.toRaw().toString('hex'))
-})
-
-  
-
+main()
+//
+// getUTXOS()
+// .then(rawUTXO => {
+//   console.log('rawUTXO', rawUTXO)
+//   return createTX(rawUTXO)
+// })
+// .then(tx => {
+//   console.log('tx', tx.toRaw().toString('hex'))
+// })
+//
+//
+//
 
