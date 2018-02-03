@@ -1,9 +1,0 @@
-{
-    "url": "https://api.blockcypher.com/v1/btc/main",
-    "addressToSweep": "1111",
-    "destination": "1111",
-    "limit": 250,
-    "rate": 200,
-    "token": "1111",
-    "seed": "hello hello hello hello hello hello hello hello hello hello hello hello"
-}
