@@ -5,7 +5,7 @@ const sleep = require('await-sleep')
 const cs = require('coinstring')
 const fs = require('fs')
 
-const throttleTime = 200
+const throttleTime = 3300
 const confFileName = './config.json'
 const config = js.readFileSync(confFileName)
 
@@ -38,6 +38,7 @@ async function getUTXOS (keyObject) {
   let numUtxoBlock = 0
   let i = 0
   numErrors = 0
+  console.log('txs.length=' + txs.length.toString())
   while (i < txs.length) {
     let request = `${config.url}/txs/${txs[i].tx_hash}?includeHex=true&token=${config.token}`
     console.log(request)
@@ -57,7 +58,7 @@ async function getUTXOS (keyObject) {
           const tx = await createTX(rawUtxoLimitBlock, keyObject)
           const txHex = tx.toRaw().toString('hex')
           console.log('***** Hit limit. Creating tx *****')
-          console.log('tx: ', txHex)
+          console.log('sub tx: ', txHex)
           fs.writeFileSync(`out/${keyObject.addressToSweep}_tx_${numUtxoBlock}.txt`, txHex + '\n')
           numUtxoBlock++
           rawUTXO = []
@@ -65,6 +66,7 @@ async function getUTXOS (keyObject) {
       }
       numErrors = 0
       i++
+      await sleep(throttleTime)
     } catch (e) {
       console.log(e)
       numErrors++
@@ -81,7 +83,7 @@ async function getUTXOS (keyObject) {
     const rawUtxoLimitBlock = rawUTXO.slice(0)
     const tx = await createTX(rawUtxoLimitBlock, keyObject)
     const txHex = tx.toRaw().toString('hex')
-    console.log('tx: ', txHex)
+    console.log('final tx: ', txHex)
     fs.writeFileSync(`out/${keyObject.addressToSweep}_tx_${numUtxoBlock}.txt`, txHex + '\n')
   }
   await sleep(throttleTime)
@@ -117,6 +119,25 @@ async function createTX (utxos, keyObject) {
 }
 
 async function main () {
+  if (process.argv[2] === 'pushtx') {
+    const dir = fs.readdirSync('out/')
+    for (const f of dir) {
+      try {
+        console.log('reading file: ' + f)
+        const file = fs.readFileSync('out/' + f, 'utf8')
+        console.log('pushtx file: ' + f)
+        await fetch('https://blockchain.info/pushtx', {
+          method: 'POST',
+          body:    'tx=' + file,
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        })
+      } catch (e) {
+        console.log(e)
+      }
+    }
+    return
+  }
+
   try {
     fs.mkdirSync('out')
   } catch (e) {
@@ -127,7 +148,7 @@ async function main () {
     // console.log('rawUtxo:', rawUtxo)
     // const tx = await createTX(rawUtxo, keyObject)
     // const txHex = tx.toRaw().toString('hex')
-    // console.log('tx: ', txHex)
+    // console.log('main tx: ', txHex)
     // fs.writeFileSync(`out/${keyObject.addressToSweep}_tx.txt`, txHex + '\n')
   }
 }
