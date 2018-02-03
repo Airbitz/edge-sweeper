@@ -3,6 +3,6 @@
 /build
 /lib
 /node_modules
-/out
+/out*
 conf.json
 config.json
