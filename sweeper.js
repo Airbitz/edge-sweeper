@@ -33,7 +33,10 @@ async function getUTXOS (keyObject) {
     }
   }
   let jsonObj = await response.json()
-  let txs = jsonObj.txrefs
+  let txs = []
+  if (jsonObj.txrefs) {
+    txs = jsonObj.txrefs
+  }
   let rawUTXO = []
   let numUtxoBlock = 0
   let i = 0
