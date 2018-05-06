@@ -1,0 +1,11 @@
+[ignore]
+<PROJECT_ROOT>/lib/.*.js.flow
+<PROJECT_ROOT>/test/.*.js.flow
+
+[include]
+
+[libs]
+
+[options]
+
+[lints]
