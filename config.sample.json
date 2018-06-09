@@ -1,0 +1,22 @@
+{
+    "account": "any arbitrary name of config",
+    "groups": [
+        {
+            "name": "some name",
+            "keysToSweep": [
+                { "addressToSweep": "17fdDvchuUJ97knEAVTMmBg9R2kUaLGm5K", "seed": "KjzLaE8me2FHEH7TpcTfuKrL5vrANUqKjURQbRsomeprivatekey" },
+                { "addressToSweep": "1QDH6o6xVzRDUQtJDKsmHTRNsk1EFnBs7n", "seed": "Lh2WYioQ5rAwcBUQtQYVpKwrDLQE8ar7LTB3xWsomeprivatekey" }
+            ],
+            "destination": "1KLndnZwp4oaSjimZcxChcG4nJmoKDRTu1"
+        },
+        {
+            "name": "some name 2",
+            "keysToSweep": [
+                { "addressToSweep": "1LNarwcSL6cxrc3esz2eHeKsrnHmVyFNT8", "seed": "L3Tp2JDTRwuUJKfvKPYv9wYjT8nrWTCcm4rVYEsomeprivatekey" }
+            ],
+            "destination": "1Kvm5Lk5rjBdpxdkQS9uyZwcy7rGWywzHv"
+        }
+    ],
+    "limit": 250,
+    "rate": 5000
+}

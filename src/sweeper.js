@@ -3,19 +3,17 @@
 const fetch = require('node-fetch')
 const bcoin = require('bcoin')
 const js = require('jsonfile')
-const sleep = require('await-sleep')
 const cs = require('coinstring')
 const fs = require('fs')
 const net = require('net')
 const tls = require('tls')
 
-const throttleTime = 3300
 const confFileName = './config.json'
 const config = js.readFileSync(confFileName)
-const _serverUrl = 'electrum://electrum.hsmiths.com:8080'
+const _serverUrl = 'electrum://electrum-bu-az-wusa2.airbitz.co:50001'
 const maxErrors = 10
 
-async function makeSweep (keyObject) {
+async function makeSweep (keyObject, destination) {
   console.log('**********************************************************************')
   console.log('*********** Getting utxos for address: ' + keyObject.addressToSweep)
   // let request = `${config.url}/addrs/${keyObject.addressToSweep}?unspentOnly=true&confirmation=1&limit=2000&token=${config.token}`
@@ -45,25 +43,22 @@ async function makeSweep (keyObject) {
   let i = 0
   console.log('txs.length=' + txs.length.toString())
   while (i < txs.length) {
-    let request = `${config.url}/txs/${txs[i].tx_hash}?includeHex=true&token=${config.token}`
-    console.log(request)
     try {
-      let response = await fetch(request)
-      let jsonObj = await response.json()
-      // const rawTx = await getTx(txs[i].tx_hash)
+      // $FlowFixMe
+      const jsonObj = await getTx(txs[i].tx_hash)
 
       // if (rawTx) {
-      if (jsonObj && jsonObj.hex) {
+      if (jsonObj) {
         rawUTXO.push({
           // rawTx,
-          rawTx: jsonObj.hex,
+          rawTx: jsonObj,
           index: txs[i].tx_pos,
           height: txs[i].height
         })
 
         if (rawUTXO.length >= config.limit) {
           const rawUtxoLimitBlock = rawUTXO.slice(0)
-          const tx = await createTX(rawUtxoLimitBlock, keyObject)
+          const tx = await createTX(rawUtxoLimitBlock, keyObject, destination)
           const txHex = tx.toRaw().toString('hex')
           console.log('***** Hit limit. Creating tx *****')
           console.log('sub tx: ', txHex)
@@ -74,7 +69,6 @@ async function makeSweep (keyObject) {
       }
       numErrors = 0
       i++
-      await sleep(throttleTime)
     } catch (e) {
       console.log(e)
       numErrors++
@@ -82,22 +76,19 @@ async function makeSweep (keyObject) {
         console.log('Hit max errors')
         return
       }
-      console.log('Hit error. Sleeping for ' + (throttleTime * numErrors).toString())
-      await sleep(throttleTime * numErrors)
     }
   }
   if (rawUTXO.length) {
     console.log('***** Creating final tx *****')
     const rawUtxoLimitBlock = rawUTXO.slice(0)
-    const tx = await createTX(rawUtxoLimitBlock, keyObject)
+    const tx = await createTX(rawUtxoLimitBlock, keyObject, destination)
     const txHex = tx.toRaw().toString('hex')
     console.log('final tx: ', txHex)
     fs.writeFileSync(`out/${keyObject.addressToSweep}_tx_${numUtxoBlock}.txt`, txHex + '\n')
   }
-  await sleep(throttleTime)
 }
 
-async function createTX (utxos, keyObject) {
+async function createTX (utxos, keyObject, destination) {
   const mtx = new bcoin.primitives.MTX()
   let amount = 0
   const coins = utxos.map(({ rawTx, index, height }) => {
@@ -108,7 +99,7 @@ async function createTX (utxos, keyObject) {
     return coin
   })
 
-  const script = bcoin.script.fromAddress(config.destination)
+  const script = bcoin.script.fromAddress(destination)
   mtx.addOutput(script, amount)
 
   await mtx.fund(coins, {
@@ -150,8 +141,15 @@ async function main () {
   } catch (e) {
     console.log(e)
   }
-  for (const keyObject of config.keysToSweep) {
-    await makeSweep(keyObject)
+  for (const group of config.groups) {
+    console.log('*********************************************')
+    console.log('*********************************************')
+    console.log(`****** Sweeping group ${group.name}`)
+    console.log('*********************************************')
+    console.log('*********************************************')
+    for (const keyObject of group.keysToSweep) {
+      await makeSweep(keyObject, group.destination)
+    }
   }
 }
 
@@ -161,6 +159,103 @@ async function main () {
 // }
 
 main()
+
+async function getTx (txid: string): Promise<Object> {
+  const serverUrl = _serverUrl
+  return new Promise((resolve) => {
+    console.log('*********** getTx:' + txid)
+    // let regex = new RegExp(/electrum:\/\/(.*):(.*)/)
+    let regex
+    let ssl = false
+    if (typeof serverUrl !== 'string') {
+      resolve({})
+    }
+    if (serverUrl.startsWith('electrums:')) {
+      regex = new RegExp(/electrums:\/\/(.*):(.*)/)
+      ssl = true
+    } else {
+      regex = new RegExp(/electrum:\/\/(.*):(.*)/)
+    }
+    let results = regex.exec(serverUrl)
+    let resolved = false
+    let client
+
+    if (results !== null) {
+      const port = results[2]
+      const host = results[1]
+      let tcp
+      if (ssl) {
+        tcp = tls
+      } else {
+        tcp = net
+      }
+      client = tcp.connect({ port, host, rejectUnauthorized: false }, () => {
+        // console.log('connect')
+        const query = `{ "id": 1, "method": "blockchain.transaction.get", "params": ["${txid}"] }\n`
+        if (client) {
+          client.write(query)
+        }
+        // console.log('query:' + query + '***')
+      })
+    } else {
+      resolve({})
+    }
+    let out = {}
+
+    let jsonData = ''
+
+    if (client) {
+      client.on('data', (data) => {
+        let results = data.toString('ascii')
+        // console.log(results)
+        let resultObj
+        try {
+          resultObj = JSON.parse(jsonData + results)
+        } catch (e) {
+          jsonData += results
+          return {}
+        }
+
+        if (resultObj !== null) {
+          out = resultObj.result
+        }
+        // console.log(dateString())
+        // console.log('-------------- FINISHED getTx: ' + serverUrl)
+        if (client) {
+          client.write('Goodbye!!!')
+          client.destroy()
+        }
+        resolved = true
+        resolve(out)
+      })
+
+      client.on('error', function (err) {
+        const e = err.code ? err.code : ''
+        // console.log(dateString())
+        console.log('getTx:' + serverUrl + ' ERROR:' + e)
+        resolved = true
+        resolve({})
+      })
+
+      client.on('close', function () {
+        // console.log(dateString())
+        // console.log('CLOSE getTx:' + serverUrl)
+        resolved = true
+        resolve({})
+      })
+
+      setTimeout(() => {
+        if (!resolved && client) {
+          client.write('Goodbye!!!')
+          client.destroy()
+          // console.log(dateString())
+          console.log('TIMEOUT getTx:' + serverUrl)
+          resolve({})
+        }
+      }, 10000)
+    }
+  })
+}
 
 async function getUtxos (address: string): Promise<Array<Object>> {
   const serverUrl = _serverUrl
@@ -220,7 +315,7 @@ async function getUtxos (address: string): Promise<Array<Object>> {
         utxos = resultObj.result
       }
       // console.log(dateString())
-      // console.log('-------------- FINISHED getTx: ' + serverUrl)
+      // console.log('-------------- FINISHED getUtxo: ' + serverUrl)
       client.write('Goodbye!!!')
       client.destroy()
       resolved = true
@@ -230,14 +325,14 @@ async function getUtxos (address: string): Promise<Array<Object>> {
     client.on('error', function (err) {
       const e = err.code ? err.code : ''
       // console.log(dateString())
-      console.log('getTx:' + serverUrl + ' ERROR:' + e)
+      console.log('getUtxo:' + serverUrl + ' ERROR:' + e)
       resolved = true
       resolve([])
     })
 
     client.on('close', function () {
       // console.log(dateString())
-      console.log('CLOSE getTx:' + serverUrl)
+      console.log('CLOSE getUtxo:' + serverUrl)
       resolved = true
       resolve([])
     })
@@ -247,7 +342,7 @@ async function getUtxos (address: string): Promise<Array<Object>> {
         client.write('Goodbye!!!')
         client.destroy()
         // console.log(dateString())
-        console.log('TIMEOUT getTx:' + serverUrl)
+        console.log('TIMEOUT getUtxo:' + serverUrl)
         resolve([])
       }
     }, 10000)
