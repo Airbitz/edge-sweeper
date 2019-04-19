@@ -10,7 +10,7 @@ const tls = require('tls')
 
 const confFileName = './config.json'
 const config = js.readFileSync(confFileName)
-const _serverUrl = 'electrum://electrum-bu-az-wusa2.airbitz.co:50001'
+const _serverUrl = 'electrum://electrum2.villocq.com:50001'
 const maxErrors = 10
 
 async function makeSweep (keyObject, destination) {

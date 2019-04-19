@@ -1,9 +1,11 @@
 {
   "name": "sweeper",
   "version": "1.0.0",
-  "description": "",
+  "description": "Tool to sweep funds from a pool of private keys",
   "main": "index.js",
   "scripts": {
+    "sweep": "node lib/sweeper.js",
+    "pushtx": "node lib/sweeper.js pushtx",
     "build": "flow-remove-types src/ -d lib/",
     "built": "npm run build && npm run test",
     "flow": "flow",
@@ -14,7 +16,11 @@
     "precommit": "npm run build && npm run lint",
     "prepare": "npm run build"
   },
-  "author": "thehobbit85 <thehobbit85@gmail.com>",
+  "author": "Airbitz Inc (DBA Edge)",
+  "contributors": [
+    "Eliran Zach <eliran@edge.app>",
+    "Paul Puey <paul@edge.app>"
+  ],
   "license": "ISC",
   "dependencies": {
     "await-sleep": "0.0.1",
